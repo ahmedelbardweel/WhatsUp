@@ -6,27 +6,11 @@
             "use": "vercel-php@0.7.3"
         },
         {
-            "src": "public/debug.php",
-            "use": "vercel-php@0.7.3"
-        },
-        {
-            "src": "public/css/**",
-            "use": "@vercel/static"
-        },
-        {
-            "src": "public/js/**",
-            "use": "@vercel/static"
-        },
-        {
-            "src": "public/favicon.ico",
+            "src": "public/**",
             "use": "@vercel/static"
         }
     ],
     "routes": [
-        {
-            "src": "/debug",
-            "dest": "/public/debug.php"
-        },
         {
             "src": "/css/(.*)",
             "dest": "/public/css/$1"
@@ -36,7 +20,7 @@
             "dest": "/public/js/$1"
         },
         {
-            "src": "/favicon\\.ico",
+            "src": "/favicon.ico",
             "dest": "/public/favicon.ico"
         },
         {
