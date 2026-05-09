@@ -181,8 +181,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="voice-loader hidden"></div>
                         </button>
                         <div class="voice-waveform">
-                            <div class="voice-bars">${Array(20).fill('<span></span>').join('')}</div>
-                            <audio src="/storage/${msg.media_url}" preload="metadata" ontimeupdate="updateVoiceProgress(this)" onended="resetVoiceUI(this)"></audio>
+                            <div class="voice-bars">${Array(25).fill('<span></span>').join('')}</div>
+                            <audio src="/storage/${msg.media_url}" 
+                                preload="auto" 
+                                ontimeupdate="updateVoiceProgress(this)" 
+                                onended="resetVoiceUI(this)"
+                                onwaiting="showVoiceLoader(this)"
+                                onplaying="hideVoiceLoader(this)"
+                                onpause="hideVoiceLoader(this)"></audio>
                         </div>
                         <span class="voice-dur">${dur}</span>
                     </div>`;
@@ -238,38 +244,37 @@ document.addEventListener('DOMContentLoaded', () => {
     window.toggleAudio = function (btn) {
         const audio = btn.closest('.voice-message').querySelector('audio');
         const icon = btn.querySelector('span');
-        const loader = btn.querySelector('.voice-loader');
 
         if (audio.paused) {
-            // If not loaded yet
-            if (audio.readyState < 3) {
-                icon.classList.add('hidden');
-                loader.classList.remove('hidden');
+            // Pause all other playing audios
+            document.querySelectorAll('.voice-message audio').forEach(a => { 
+                if (a !== audio) { a.pause(); resetVoiceUI(a); } 
+            });
+            
+            audio.play().catch(err => {
+                console.error('Playback error:', err);
+                // If it fails because of user interaction required or not loaded
                 audio.load();
-                audio.oncanplay = () => {
-                    icon.classList.remove('hidden');
-                    loader.classList.add('hidden');
-                    startPlayback(audio, icon);
-                };
-            } else {
-                startPlayback(audio, icon);
-            }
+                audio.play();
+            });
+            icon.textContent = 'pause';
         } else {
             audio.pause();
             icon.textContent = 'play_arrow';
         }
     };
 
-    function startPlayback(audio, icon) {
-        // Pause all other playing audios
-        document.querySelectorAll('.voice-message audio').forEach(a => { if (a !== audio) { a.pause(); resetVoiceUI(a); } });
-        audio.play().then(() => {
-            icon.textContent = 'pause';
-        }).catch(err => {
-            console.error('Playback error:', err);
-            icon.textContent = 'play_arrow';
-        });
-    }
+    window.showVoiceLoader = function (audio) {
+        const btn = audio.closest('.voice-message').querySelector('.voice-play-btn');
+        btn.querySelector('span').classList.add('hidden');
+        btn.querySelector('.voice-loader').classList.remove('hidden');
+    };
+
+    window.hideVoiceLoader = function (audio) {
+        const btn = audio.closest('.voice-message').querySelector('.voice-play-btn');
+        btn.querySelector('span').classList.remove('hidden');
+        btn.querySelector('.voice-loader').classList.add('hidden');
+    };
 
     window.updateVoiceProgress = function (audio) {
         const container = audio.closest('.voice-message');
@@ -279,8 +284,14 @@ document.addEventListener('DOMContentLoaded', () => {
         bars.forEach((bar, index) => {
             if (index < progress) {
                 bar.classList.add('filled');
+                // Make the bar "jump" a bit to look like a waveform
+                if (!audio.paused) {
+                    const h = 5 + Math.random() * 15;
+                    bar.style.height = h + 'px';
+                }
             } else {
                 bar.classList.remove('filled');
+                bar.style.height = ''; // Reset height
             }
         });
     };
@@ -289,7 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = audio.closest('.voice-message').querySelector('.voice-play-btn span');
         btn.textContent = 'play_arrow';
         const bars = audio.closest('.voice-message').querySelectorAll('.voice-bars span');
-        bars.forEach(bar => bar.classList.remove('filled'));
+        bars.forEach(bar => {
+            bar.classList.remove('filled');
+            bar.style.height = '';
+        });
+        hideVoiceLoader(audio);
     };
 
     window.loadFullImage = function (url, msgId) {

@@ -1070,3 +1070,7 @@ body {
 .voice-play-btn .hidden {
     display: none;
 }
+
+.voice-bars span {
+    transition: height 0.1s ease, background-color 0.2s ease;
+}
