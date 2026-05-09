@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let activeConversationId = null;
     let pollInterval = null;
-    const loadedImages = new Set(); // Store IDs of images already downloaded
+    const loadedImages = new Set(); 
+    const wavesurfers = new Map(); // Store Wavesurfer instances by message ID
 
     // Theme Toggle Logic
     themeToggle.addEventListener('click', () => {
@@ -157,9 +158,70 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(`/api/conversations/${activeConversationId}/messages`)
             .then(res => res.json())
             .then(data => {
+                // Destroy old wavesurfer instances before rendering new ones
+                wavesurfers.forEach(ws => ws.destroy());
+                wavesurfers.clear();
+                
                 renderMessages(data);
+                
+                // Initialize Wavesurfer for each audio message
+                data.forEach(msg => {
+                    if (msg.type === 'audio' && msg.media_url) {
+                        initWavesurfer(msg.id);
+                    }
+                });
             });
     }
+
+    function initWavesurfer(id) {
+        const container = document.getElementById(`waveform-${id}`);
+        if (!container) return;
+
+        const ws = WaveSurfer.create({
+            container: `#waveform-${id}`,
+            waveColor: '#667781',
+            progressColor: '#00a884',
+            cursorWidth: 0,
+            barWidth: 2,
+            barGap: 3,
+            barRadius: 3,
+            height: 40,
+            url: container.dataset.url,
+        });
+
+        const icon = document.getElementById(`ws-icon-${id}`);
+        const loader = document.getElementById(`ws-loader-${id}`);
+
+        ws.on('loading', () => {
+            icon.classList.add('hidden');
+            loader.classList.remove('hidden');
+        });
+
+        ws.on('ready', () => {
+            icon.classList.remove('hidden');
+            loader.classList.add('hidden');
+            const dur = ws.getDuration();
+            document.getElementById(`ws-dur-${id}`).textContent = formatDuration(Math.round(dur));
+        });
+
+        ws.on('play', () => {
+            icon.textContent = 'pause';
+            // Stop other playing wavesurfers
+            wavesurfers.forEach((otherWs, otherId) => {
+                if (otherId !== id && otherWs.isPlaying()) otherWs.pause();
+            });
+        });
+
+        ws.on('pause', () => icon.textContent = 'play_arrow');
+        ws.on('finish', () => icon.textContent = 'play_arrow');
+
+        wavesurfers.set(id, ws);
+    }
+
+    window.toggleWS = function(id) {
+        const ws = wavesurfers.get(id);
+        if (ws) ws.playPause();
+    };
 
     function renderMessages(messages) {
         messagesContainer.innerHTML = '<div class="date-badge">اليوم</div>';
@@ -175,24 +237,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (msg.type === 'audio' && msg.media_url) {
                 const dur = msg.duration ? formatDuration(msg.duration) : '0:00';
                 contentHtml = `
-                    <div class="voice-message" id="voice-${msg.id}">
-                        <button class="voice-play-btn" onclick="toggleAudio(this)">
-                            <span class="material-symbols-outlined">play_arrow</span>
-                            <div class="voice-loader hidden"></div>
+                    <div class="voice-message ws-message" id="voice-${msg.id}">
+                        <button class="voice-play-btn" onclick="toggleWS(${msg.id})">
+                            <span class="material-symbols-outlined" id="ws-icon-${msg.id}">play_arrow</span>
+                            <div class="voice-loader hidden" id="ws-loader-${msg.id}"></div>
                         </button>
-                        <div class="voice-waveform">
-                            <div class="voice-bars">${Array(25).fill('<span></span>').join('')}</div>
-                            <audio src="/storage/${msg.media_url}" 
-                                preload="auto" 
-                                ontimeupdate="updateVoiceProgress(this)" 
-                                onended="resetVoiceUI(this)"
-                                onwaiting="showVoiceLoader(this)"
-                                onplaying="hideVoiceLoader(this)"
-                                onpause="hideVoiceLoader(this)"
-                                onstalled="showVoiceLoader(this)"
-                                onerror="handleVoiceError(this)"></audio>
-                        </div>
-                        <span class="voice-dur">${dur}</span>
+                        <div class="voice-waveform ws-waveform" id="waveform-${msg.id}" data-url="/storage/${msg.media_url}"></div>
+                        <span class="voice-dur" id="ws-dur-${msg.id}">${dur}</span>
                     </div>`;
             } else if (msg.type === 'image' && msg.media_url) {
                 const imgUrl = `/storage/${msg.media_url}`;
@@ -242,96 +293,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const s = secs % 60;
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
-
-    window.toggleAudio = function (btn) {
-        const audio = btn.closest('.voice-message').querySelector('audio');
-        const icon = btn.querySelector('span');
-
-        if (audio.paused) {
-            // Pause all other playing audios
-            document.querySelectorAll('.voice-message audio').forEach(a => { 
-                if (a !== audio) { a.pause(); resetVoiceUI(a); } 
-            });
-            
-            audio.play().catch(err => {
-                console.error('Playback error:', err);
-                // If it fails because of user interaction required or not loaded
-                audio.load();
-                audio.play();
-            });
-            icon.textContent = 'pause';
-        } else {
-            audio.pause();
-            icon.textContent = 'play_arrow';
-        }
-    };
-
-    window.showVoiceLoader = function (audio) {
-        const btn = audio.closest('.voice-message').querySelector('.voice-play-btn');
-        if (!btn) return;
-        btn.querySelector('span').classList.add('hidden');
-        btn.querySelector('.voice-loader').classList.remove('hidden');
-    };
-
-    window.hideVoiceLoader = function (audio) {
-        const btn = audio.closest('.voice-message').querySelector('.voice-play-btn');
-        if (!btn) return;
-        btn.querySelector('span').classList.remove('hidden');
-        btn.querySelector('.voice-loader').classList.add('hidden');
-    };
-
-    window.handleVoiceError = function (audio) {
-        console.error('Audio load error:', audio.error);
-        const container = audio.closest('.voice-message');
-        container.classList.add('error');
-        hideVoiceLoader(audio);
-        const icon = container.querySelector('.voice-play-btn span');
-        icon.textContent = 'error';
-        icon.style.color = '#ef4444';
-        
-        // Attempt one retry
-        if (!audio.dataset.retried) {
-            audio.dataset.retried = 'true';
-            setTimeout(() => {
-                audio.load();
-                icon.textContent = 'play_arrow';
-                icon.style.color = '';
-            }, 2000);
-        }
-    };
-
-    window.updateVoiceProgress = function (audio) {
-        const container = audio.closest('.voice-message');
-        const bars = container.querySelectorAll('.voice-bars span');
-        if (isNaN(audio.duration)) return;
-        
-        const progress = (audio.currentTime / audio.duration) * bars.length;
-        
-        bars.forEach((bar, index) => {
-            if (index < progress) {
-                bar.classList.add('filled');
-                if (!audio.paused) {
-                    // Smoother height variation
-                    const h = 8 + Math.sin(Date.now() / 100 + index) * 10;
-                    bar.style.height = Math.abs(h) + 'px';
-                }
-            } else {
-                bar.classList.remove('filled');
-                bar.style.height = '';
-            }
-        });
-    };
-
-    window.resetVoiceUI = function (audio) {
-        const btn = audio.closest('.voice-message').querySelector('.voice-play-btn span');
-        btn.textContent = 'play_arrow';
-        const bars = audio.closest('.voice-message').querySelectorAll('.voice-bars span');
-        bars.forEach(bar => {
-            bar.classList.remove('filled');
-            bar.style.height = '';
-        });
-        hideVoiceLoader(audio);
-    };
 
     window.loadFullImage = function (url, msgId) {
         const placeholder = document.querySelector(`#img-wrapper-${msgId} .image-placeholder`);

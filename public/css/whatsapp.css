@@ -1074,3 +1074,10 @@ body {
 .voice-bars span {
     transition: height 0.1s ease, background-color 0.2s ease;
 }
+
+.ws-waveform {
+    flex-grow: 1;
+    min-width: 150px;
+    height: 40px;
+    cursor: pointer;
+}
