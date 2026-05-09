@@ -83,5 +83,6 @@
             </div>
         </div>
     </div>
+    <script src="{{ asset('js/whatsapp.js') }}"></script>
 </body>
 </html>
