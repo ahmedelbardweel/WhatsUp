@@ -188,7 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 onended="resetVoiceUI(this)"
                                 onwaiting="showVoiceLoader(this)"
                                 onplaying="hideVoiceLoader(this)"
-                                onpause="hideVoiceLoader(this)"></audio>
+                                onpause="hideVoiceLoader(this)"
+                                onstalled="showVoiceLoader(this)"
+                                onerror="handleVoiceError(this)"></audio>
                         </div>
                         <span class="voice-dur">${dur}</span>
                     </div>`;
@@ -266,32 +268,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.showVoiceLoader = function (audio) {
         const btn = audio.closest('.voice-message').querySelector('.voice-play-btn');
+        if (!btn) return;
         btn.querySelector('span').classList.add('hidden');
         btn.querySelector('.voice-loader').classList.remove('hidden');
     };
 
     window.hideVoiceLoader = function (audio) {
         const btn = audio.closest('.voice-message').querySelector('.voice-play-btn');
+        if (!btn) return;
         btn.querySelector('span').classList.remove('hidden');
         btn.querySelector('.voice-loader').classList.add('hidden');
+    };
+
+    window.handleVoiceError = function (audio) {
+        console.error('Audio load error:', audio.error);
+        const container = audio.closest('.voice-message');
+        container.classList.add('error');
+        hideVoiceLoader(audio);
+        const icon = container.querySelector('.voice-play-btn span');
+        icon.textContent = 'error';
+        icon.style.color = '#ef4444';
+        
+        // Attempt one retry
+        if (!audio.dataset.retried) {
+            audio.dataset.retried = 'true';
+            setTimeout(() => {
+                audio.load();
+                icon.textContent = 'play_arrow';
+                icon.style.color = '';
+            }, 2000);
+        }
     };
 
     window.updateVoiceProgress = function (audio) {
         const container = audio.closest('.voice-message');
         const bars = container.querySelectorAll('.voice-bars span');
+        if (isNaN(audio.duration)) return;
+        
         const progress = (audio.currentTime / audio.duration) * bars.length;
         
         bars.forEach((bar, index) => {
             if (index < progress) {
                 bar.classList.add('filled');
-                // Make the bar "jump" a bit to look like a waveform
                 if (!audio.paused) {
-                    const h = 5 + Math.random() * 15;
-                    bar.style.height = h + 'px';
+                    // Smoother height variation
+                    const h = 8 + Math.sin(Date.now() / 100 + index) * 10;
+                    bar.style.height = Math.abs(h) + 'px';
                 }
             } else {
                 bar.classList.remove('filled');
-                bar.style.height = ''; // Reset height
+                bar.style.height = '';
             }
         });
     };

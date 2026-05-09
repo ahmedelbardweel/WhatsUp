@@ -15,15 +15,45 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [ChatController::class, 'index'])->name('index');
     
-    // Serve storage files from /tmp on Vercel
+    // Serve storage files from /tmp on Vercel with Range Request support
     Route::get('/storage/{path}', function ($path) {
         $fullPath = storage_path('app/public/' . $path);
         if (!file_exists($fullPath)) abort(404);
         
-        $file = file_get_contents($fullPath);
+        $size = filesize($fullPath);
         $type = mime_content_type($fullPath);
+        $file = fopen($fullPath, 'rb');
         
-        return response($file)->header('Content-Type', $type);
+        $start = 0;
+        $end = $size - 1;
+        
+        if (request()->hasHeader('Range')) {
+            $range = request()->header('Range');
+            preg_match('/bytes=(\d+)-(\d+)?/', $range, $matches);
+            $start = intval($matches[1]);
+            $end = isset($matches[2]) ? intval($matches[2]) : $size - 1;
+            
+            header('HTTP/1.1 206 Partial Content');
+            header("Content-Range: bytes $start-$end/$size");
+            header('Content-Length: ' . ($end - $start + 1));
+        } else {
+            header('Content-Length: ' . $size);
+        }
+        
+        header("Content-Type: $type");
+        header('Accept-Ranges: bytes');
+        
+        fseek($file, $start);
+        $buffer = 1024 * 8;
+        while (!feof($file) && ($pos = ftell($file)) <= $end) {
+            if ($pos + $buffer > $end) {
+                $buffer = $end - $pos + 1;
+            }
+            echo fread($file, $buffer);
+            flush();
+        }
+        fclose($file);
+        exit;
     })->where('path', '.*');
     
     // API Routes for Chat
