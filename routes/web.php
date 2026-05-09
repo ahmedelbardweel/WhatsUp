@@ -13,7 +13,18 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Protected Routes
 Route::middleware('auth')->group(function () {
-    Route::get('/', [ChatController::class, 'index']);
+    Route::get('/', [ChatController::class, 'index'])->name('index');
+    
+    // Serve storage files from /tmp on Vercel
+    Route::get('/storage/{path}', function ($path) {
+        $fullPath = storage_path('app/public/' . $path);
+        if (!file_exists($fullPath)) abort(404);
+        
+        $file = file_get_contents($fullPath);
+        $type = mime_content_type($fullPath);
+        
+        return response($file)->header('Content-Type', $type);
+    })->where('path', '.*');
     
     // API Routes for Chat
     Route::get('/api/conversations', [ChatController::class, 'getConversations']);

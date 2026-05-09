@@ -87,9 +87,10 @@ class ChatController extends Controller
         if (str_starts_with($mime, 'image/')) $type = 'image';
         elseif (str_starts_with($mime, 'video/')) $type = 'video';
 
-        // Ensure directory exists
-        if (!\Storage::disk('public')->exists('attachments')) {
-            \Storage::disk('public')->makeDirectory('attachments');
+        // Ensure directory exists in /tmp storage
+        $storagePath = storage_path('app/public/attachments');
+        if (!file_exists($storagePath)) {
+            mkdir($storagePath, 0777, true);
         }
 
         $path = $file->store('attachments', 'public');
