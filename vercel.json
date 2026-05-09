@@ -4,9 +4,17 @@
         {
             "src": "api/index.php",
             "use": "vercel-php@0.7.3"
+        },
+        {
+            "src": "public/debug.php",
+            "use": "vercel-php@0.7.3"
         }
     ],
     "routes": [
+        {
+            "src": "/debug",
+            "dest": "/public/debug.php"
+        },
         {
             "src": "/css/(.*)",
             "dest": "/public/css/$1"
