@@ -236,18 +236,19 @@ document.addEventListener('DOMContentLoaded', () => {
             let contentHtml = '';
             if (msg.type === 'audio' && msg.media_url) {
                 const dur = msg.duration ? formatDuration(msg.duration) : '0:00';
+                const mediaUrl = msg.media_url.startsWith('data:') ? msg.media_url : `/storage/${msg.media_url}`;
                 contentHtml = `
                     <div class="voice-message ws-message" id="voice-${msg.id}">
                         <button class="voice-play-btn" onclick="toggleWS(${msg.id})">
                             <span class="material-symbols-outlined" id="ws-icon-${msg.id}">play_arrow</span>
                             <div class="voice-loader hidden" id="ws-loader-${msg.id}"></div>
                         </button>
-                        <div class="voice-waveform ws-waveform" id="waveform-${msg.id}" data-url="/storage/${msg.media_url}"></div>
+                        <div class="voice-waveform ws-waveform" id="waveform-${msg.id}" data-url="${mediaUrl}"></div>
                         <span class="voice-dur" id="ws-dur-${msg.id}">${dur}</span>
                     </div>`;
             } else if (msg.type === 'image' && msg.media_url) {
-                const imgUrl = `/storage/${msg.media_url}`;
-                const isLoaded = loadedImages.has(msg.id);
+                const imgUrl = msg.media_url.startsWith('data:') ? msg.media_url : `/storage/${msg.media_url}`;
+                const isLoaded = loadedImages.has(msg.id) || msg.media_url.startsWith('data:');
                 contentHtml = `
                     <div class="image-wrapper" id="img-wrapper-${msg.id}">
                         <div class="image-placeholder ${isLoaded ? 'hidden' : ''}" onclick="loadFullImage('${imgUrl}', ${msg.id})">
@@ -259,17 +260,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${(msg.body && !msg.body.match(/\.(jpg|jpeg|png|gif|webp)$/i)) ? `<div class="message-caption">${msg.body}</div>` : ''}
                 `;
             } else if (msg.type === 'video' && msg.media_url) {
+                const videoUrl = msg.media_url.startsWith('data:') ? msg.media_url : `/storage/${msg.media_url}`;
                 contentHtml = `
-                    <video src="/storage/${msg.media_url}" controls class="message-video"></video>
+                    <video src="${videoUrl}" controls class="message-video"></video>
                     ${msg.body ? `<div class="message-caption">${msg.body}</div>` : ''}
                 `;
             } else if (msg.type === 'file' && msg.media_url) {
+                const fileUrl = msg.media_url.startsWith('data:') ? msg.media_url : `/storage/${msg.media_url}`;
                 contentHtml = `
                     <div class="message-file">
                         <span class="material-symbols-outlined">description</span>
                         <div class="file-info">
                             <div class="file-name">${msg.body || 'ملف'}</div>
-                            <a href="/storage/${msg.media_url}" download class="file-download">تحميل</a>
+                            <a href="${fileUrl}" download class="file-download">تحميل</a>
                         </div>
                     </div>`;
             } else {

@@ -54,14 +54,17 @@ class ChatController extends Controller
     {
         $request->validate(['audio' => 'required|file|mimes:webm,ogg,wav,mp4,m4a|max:10240']);
 
-        $path = $request->file('audio')->store('voice-messages', 'public');
+        $file = $request->file('audio');
+        $base64 = base64_encode(file_get_contents($file->path()));
+        $mime = $file->getMimeType();
+        $dataUri = "data:$mime;base64,$base64";
 
         $message = Message::create([
             'conversation_id' => $conversation_id,
             'sender_id' => Auth::id(),
             'body' => null,
             'type' => 'audio',
-            'media_url' => $path,
+            'media_url' => $dataUri,
             'duration' => $request->input('duration', 0),
         ]);
 
@@ -70,14 +73,7 @@ class ChatController extends Controller
 
     public function sendFileMessage(Request $request, $conversation_id)
     {
-        \Log::info('File upload attempt for conversation: ' . $conversation_id);
-        
-        try {
-            $request->validate(['file' => 'required|file|max:20480']);
-        } catch (\Exception $e) {
-            \Log::error('Validation failed: ' . $e->getMessage());
-            return response()->json(['error' => 'حجم الملف كبير جداً أو نوعه غير مدعوم'], 422);
-        }
+        $request->validate(['file' => 'required|file|max:20480']);
 
         $file = $request->file('file');
         $originalName = $file->getClientOriginalName();
@@ -87,20 +83,15 @@ class ChatController extends Controller
         if (str_starts_with($mime, 'image/')) $type = 'image';
         elseif (str_starts_with($mime, 'video/')) $type = 'video';
 
-        // Ensure directory exists in /tmp storage
-        $storagePath = storage_path('app/public/attachments');
-        if (!file_exists($storagePath)) {
-            mkdir($storagePath, 0777, true);
-        }
-
-        $path = $file->store('attachments', 'public');
+        $base64 = base64_encode(file_get_contents($file->path()));
+        $dataUri = "data:$mime;base64,$base64";
 
         $message = Message::create([
             'conversation_id' => $conversation_id,
             'sender_id' => Auth::id(),
             'body' => $request->input('caption') ?: $originalName,
             'type' => $type,
-            'media_url' => $path,
+            'media_url' => $dataUri,
         ]);
 
         return response()->json($message->load('sender'));
