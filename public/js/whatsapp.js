@@ -175,13 +175,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (msg.type === 'audio' && msg.media_url) {
                 const dur = msg.duration ? formatDuration(msg.duration) : '0:00';
                 contentHtml = `
-                    <div class="voice-message">
+                    <div class="voice-message" id="voice-${msg.id}">
                         <button class="voice-play-btn" onclick="toggleAudio(this)">
                             <span class="material-symbols-outlined">play_arrow</span>
+                            <div class="voice-loader hidden"></div>
                         </button>
                         <div class="voice-waveform">
                             <div class="voice-bars">${Array(20).fill('<span></span>').join('')}</div>
-                            <audio src="/storage/${msg.media_url}" preload="none"></audio>
+                            <audio src="/storage/${msg.media_url}" preload="metadata" ontimeupdate="updateVoiceProgress(this)" onended="resetVoiceUI(this)"></audio>
                         </div>
                         <span class="voice-dur">${dur}</span>
                     </div>`;
@@ -237,17 +238,58 @@ document.addEventListener('DOMContentLoaded', () => {
     window.toggleAudio = function (btn) {
         const audio = btn.closest('.voice-message').querySelector('audio');
         const icon = btn.querySelector('span');
+        const loader = btn.querySelector('.voice-loader');
+
         if (audio.paused) {
-            // Pause all other playing audios
-            document.querySelectorAll('.voice-message audio').forEach(a => { if (a !== audio) a.pause(); });
-            document.querySelectorAll('.voice-play-btn span').forEach(i => i.textContent = 'play_arrow');
-            audio.play();
-            icon.textContent = 'pause';
-            audio.onended = () => { icon.textContent = 'play_arrow'; };
+            // If not loaded yet
+            if (audio.readyState < 3) {
+                icon.classList.add('hidden');
+                loader.classList.remove('hidden');
+                audio.load();
+                audio.oncanplay = () => {
+                    icon.classList.remove('hidden');
+                    loader.classList.add('hidden');
+                    startPlayback(audio, icon);
+                };
+            } else {
+                startPlayback(audio, icon);
+            }
         } else {
             audio.pause();
             icon.textContent = 'play_arrow';
         }
+    };
+
+    function startPlayback(audio, icon) {
+        // Pause all other playing audios
+        document.querySelectorAll('.voice-message audio').forEach(a => { if (a !== audio) { a.pause(); resetVoiceUI(a); } });
+        audio.play().then(() => {
+            icon.textContent = 'pause';
+        }).catch(err => {
+            console.error('Playback error:', err);
+            icon.textContent = 'play_arrow';
+        });
+    }
+
+    window.updateVoiceProgress = function (audio) {
+        const container = audio.closest('.voice-message');
+        const bars = container.querySelectorAll('.voice-bars span');
+        const progress = (audio.currentTime / audio.duration) * bars.length;
+        
+        bars.forEach((bar, index) => {
+            if (index < progress) {
+                bar.classList.add('filled');
+            } else {
+                bar.classList.remove('filled');
+            }
+        });
+    };
+
+    window.resetVoiceUI = function (audio) {
+        const btn = audio.closest('.voice-message').querySelector('.voice-play-btn span');
+        btn.textContent = 'play_arrow';
+        const bars = audio.closest('.voice-message').querySelectorAll('.voice-bars span');
+        bars.forEach(bar => bar.classList.remove('filled'));
     };
 
     window.loadFullImage = function (url, msgId) {

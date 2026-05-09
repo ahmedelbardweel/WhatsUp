@@ -1048,3 +1048,25 @@ body {
 .call-btn.decline { background-color: #ef4444; }
 .hidden { display: none !important; }
 
+
+/* Voice Message Progress & Loading */
+.voice-bars span.filled {
+    background-color: var(--primary-color) !important;
+}
+
+.voice-loader {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.voice-play-btn .hidden {
+    display: none;
+}
