@@ -8,6 +8,18 @@
         {
             "src": "public/debug.php",
             "use": "vercel-php@0.7.3"
+        },
+        {
+            "src": "public/css/**",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "public/js/**",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "public/favicon.ico",
+            "use": "@vercel/static"
         }
     ],
     "routes": [
@@ -22,10 +34,6 @@
         {
             "src": "/js/(.*)",
             "dest": "/public/js/$1"
-        },
-        {
-            "src": "/storage/(.*)",
-            "dest": "/public/storage/$1"
         },
         {
             "src": "/favicon\\.ico",
